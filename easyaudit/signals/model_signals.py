@@ -104,7 +104,7 @@ def pre_save(sender, instance, raw, using, update_fields, **kwargs):
                             object_id=instance.pk,
                             user_id=getattr(user, 'id', None),
                             datetime=timezone.now(),
-                            user_pk_as_string=str(user.pk) if user else user
+                            user_pk_as_string=str(user.username) if user else user
                         )
                 except Exception as e:
                     logger.exception(
@@ -163,7 +163,7 @@ def post_save(sender, instance, created, raw, using, update_fields, **kwargs):
                             object_id=instance.pk,
                             user_id=getattr(user, 'id', None),
                             datetime=timezone.now(),
-                            user_pk_as_string=str(user.pk) if user else user
+                            user_pk_as_string=str(user.username) if user else user
                         )
                 except Exception as e:
                     logger.exception(
@@ -243,7 +243,7 @@ def m2m_changed(sender, instance, action, reverse, model, pk_set, using, **kwarg
                         object_id=instance.pk,
                         user_id=getattr(user, 'id', None),
                         datetime=timezone.now(),
-                        user_pk_as_string=str(user.pk) if user else user
+                        user_pk_as_string=str(user.username) if user else user
                     )
             except Exception as e:
                 logger.exception(
@@ -286,7 +286,7 @@ def post_delete(sender, instance, using, **kwargs):
                         object_id=instance.pk,
                         user_id=getattr(user, 'id', None),
                         datetime=timezone.now(),
-                        user_pk_as_string=str(user.pk) if user else user
+                        user_pk_as_string=str(user.username) if user else user
                     )
 
             except Exception as e:
