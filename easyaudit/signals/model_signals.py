@@ -94,6 +94,13 @@ def pre_save(sender, instance, raw, using, update_fields, **kwargs):
                 c_t = ContentType.objects.get_for_model(instance)
                 sid = transaction.savepoint()
                 try:
+                    user_id = getattr(user, 'id', None)
+                    if not user_id:
+                        return None
+                    try:
+                        user_id = int(user_id)
+                    except ValueError:
+                        return None
                     with transaction.atomic():
                         crud_event = CRUDEvent.objects.create(
                             event_type=event_type,
@@ -102,7 +109,7 @@ def pre_save(sender, instance, raw, using, update_fields, **kwargs):
                             changed_fields=changed_fields,
                             content_type_id=c_t.id,
                             object_id=instance.pk,
-                            user_id=getattr(user, 'id', None),
+                            user_id=user_id,
                             datetime=timezone.now(),
                             user_pk_as_string=str(user.username) if user else user
                         )
@@ -154,6 +161,13 @@ def post_save(sender, instance, created, raw, using, update_fields, **kwargs):
                 c_t = ContentType.objects.get_for_model(instance)
                 sid = transaction.savepoint()
                 try:
+                    user_id = getattr(user, 'id', None)
+                    if not user_id:
+                        return None
+                    try:
+                        user_id = int(user_id)
+                    except ValueError:
+                        return None
                     with transaction.atomic():
                         crud_event = CRUDEvent.objects.create(
                             event_type=event_type,
@@ -161,7 +175,7 @@ def post_save(sender, instance, created, raw, using, update_fields, **kwargs):
                             object_json_repr=object_json_repr,
                             content_type_id=c_t.id,
                             object_id=instance.pk,
-                            user_id=getattr(user, 'id', None),
+                            user_id=user_id,
                             datetime=timezone.now(),
                             user_pk_as_string=str(user.username) if user else user
                         )
@@ -234,6 +248,13 @@ def m2m_changed(sender, instance, action, reverse, model, pk_set, using, **kwarg
             sid = transaction.savepoint()
 
             try:
+                user_id = getattr(user, 'id', None)
+                if not user_id:
+                    return
+                try:
+                    user_id = int(user_id)
+                except ValueError:
+                    return None
                 with transaction.atomic():
                     crud_event = CRUDEvent.objects.create(
                         event_type=event_type,
@@ -241,7 +262,7 @@ def m2m_changed(sender, instance, action, reverse, model, pk_set, using, **kwarg
                         object_json_repr=object_json_repr,
                         content_type_id=c_t.id,
                         object_id=instance.pk,
-                        user_id=getattr(user, 'id', None),
+                        user_id=user_id,
                         datetime=timezone.now(),
                         user_pk_as_string=str(user.username) if user else user
                     )
@@ -276,6 +297,13 @@ def post_delete(sender, instance, using, **kwargs):
             c_t = ContentType.objects.get_for_model(instance)
             sid = transaction.savepoint()
             try:
+                user_id = getattr(user, 'id', None)
+                if not user_id:
+                    return None
+                try:
+                    user_id = int(user_id)
+                except ValueError:
+                    return None
                 with transaction.atomic():
                     # crud event
                     crud_event = CRUDEvent.objects.create(
@@ -284,7 +312,7 @@ def post_delete(sender, instance, using, **kwargs):
                         object_json_repr=object_json_repr,
                         content_type_id=c_t.id,
                         object_id=instance.pk,
-                        user_id=getattr(user, 'id', None),
+                        user_id=user_id,
                         datetime=timezone.now(),
                         user_pk_as_string=str(user.username) if user else user
                     )
