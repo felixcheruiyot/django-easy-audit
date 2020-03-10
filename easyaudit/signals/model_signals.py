@@ -23,22 +23,24 @@ logger = logging.getLogger(__name__)
 def should_audit(instance):
     """Returns True or False to indicate whether the instance
     should be audited or not, depending on the project settings."""
+    try:
+        # do not audit any model listed in UNREGISTERED_CLASSES
+        for unregistered_class in UNREGISTERED_CLASSES:
+            if isinstance(instance, unregistered_class):
+                return False
 
-    # do not audit any model listed in UNREGISTERED_CLASSES
-    for unregistered_class in UNREGISTERED_CLASSES:
-        if isinstance(instance, unregistered_class):
-            return False
+        # only audit models listed in REGISTERED_CLASSES (if it's set)
+        if len(REGISTERED_CLASSES) > 0:
+            for registered_class in REGISTERED_CLASSES:
+                if isinstance(instance, registered_class):
+                    break
+            else:
+                return False
 
-    # only audit models listed in REGISTERED_CLASSES (if it's set)
-    if len(REGISTERED_CLASSES) > 0:
-        for registered_class in REGISTERED_CLASSES:
-            if isinstance(instance, registered_class):
-                break
-        else:
-            return False
-
-    # all good
-    return True
+        # all good
+        return True
+    except:
+        return False
 
 
 # signals
@@ -85,9 +87,11 @@ def pre_save(sender, instance, raw, using, update_fields, **kwargs):
                 user = None
 
             # callbacks
-            kwargs['request'] = get_current_request()  # make request available for callbacks
+            # make request available for callbacks
+            kwargs['request'] = get_current_request()
             create_crud_event = all(
-                callback(instance, object_json_repr, created, raw, using, update_fields, **kwargs)
+                callback(instance, object_json_repr, created,
+                         raw, using, update_fields, **kwargs)
                 for callback in CRUD_DIFFERENCE_CALLBACKS if callable(callback))
             # create crud event only if all callbacks returned True
             if create_crud_event and not created:
@@ -102,7 +106,7 @@ def pre_save(sender, instance, raw, using, update_fields, **kwargs):
                     except ValueError:
                         return None
                     with transaction.atomic():
-                        crud_event = CRUDEvent.objects.create(
+                        CRUDEvent.objects.create(
                             event_type=event_type,
                             object_repr=str(instance),
                             object_json_repr=object_json_repr,
@@ -111,12 +115,10 @@ def pre_save(sender, instance, raw, using, update_fields, **kwargs):
                             object_id=instance.pk,
                             user_id=user_id,
                             datetime=timezone.now(),
-                            user_pk_as_string=str(user.username) if user else user
+                            user_pk_as_string=str(
+                                user.username) if user else user
                         )
                 except Exception as e:
-                    logger.exception(
-                        "easy audit had a pre-save exception on CRUDEvent creation. instance: {}, instance pk: {}".format(
-                            instance, instance.pk))
                     transaction.savepoint_rollback(sid)
     except Exception:
         logger.exception('easy audit had a pre-save exception.')
@@ -150,7 +152,8 @@ def post_save(sender, instance, created, raw, using, update_fields, **kwargs):
                 user = None
 
             # callbacks
-            kwargs['request'] = get_current_request()  # make request available for callbacks
+            # make request available for callbacks
+            kwargs['request'] = get_current_request()
             create_crud_event = all(callback(instance, object_json_repr,
                                              created, raw, using, update_fields, **kwargs)
                                     for callback in CRUD_DIFFERENCE_CALLBACKS
@@ -169,7 +172,7 @@ def post_save(sender, instance, created, raw, using, update_fields, **kwargs):
                     except ValueError:
                         return None
                     with transaction.atomic():
-                        crud_event = CRUDEvent.objects.create(
+                        CRUDEvent.objects.create(
                             event_type=event_type,
                             object_repr=str(instance),
                             object_json_repr=object_json_repr,
@@ -177,12 +180,10 @@ def post_save(sender, instance, created, raw, using, update_fields, **kwargs):
                             object_id=instance.pk,
                             user_id=user_id,
                             datetime=timezone.now(),
-                            user_pk_as_string=str(user.username) if user else user
+                            user_pk_as_string=str(
+                                user.username) if user else user
                         )
                 except Exception as e:
-                    logger.exception(
-                        "easy audit had a pre-save exception on CRUDEvent creation. instance: {}, instance pk: {}".format(
-                            instance, instance.pk))
                     transaction.savepoint_rollback(sid)
     except Exception:
         logger.exception('easy audit had a post-save exception.')
@@ -199,8 +200,8 @@ def _m2m_rev_field_name(model1, model2):
     m2m_field_names = [
         rel.get_accessor_name() for rel in model1._meta.get_fields()
         if rel.many_to_many
-           and rel.auto_created
-           and rel.related_model == model2
+        and rel.auto_created
+        and rel.related_model == model2
     ]
     return m2m_field_names[0]
 
@@ -223,7 +224,8 @@ def m2m_changed(sender, instance, action, reverse, model, pk_set, using, **kwarg
                 # django serializers ignore extra fields.
                 tmp_repr = json.loads(object_json_repr)
 
-                m2m_rev_field = _m2m_rev_field_name(instance._meta.concrete_model, model)
+                m2m_rev_field = _m2m_rev_field_name(
+                    instance._meta.concrete_model, model)
                 related_instances = getattr(instance, m2m_rev_field).all()
                 related_ids = [r.pk for r in related_instances]
 
@@ -256,7 +258,7 @@ def m2m_changed(sender, instance, action, reverse, model, pk_set, using, **kwarg
                 except ValueError:
                     return None
                 with transaction.atomic():
-                    crud_event = CRUDEvent.objects.create(
+                    CRUDEvent.objects.create(
                         event_type=event_type,
                         object_repr=str(instance),
                         object_json_repr=object_json_repr,
@@ -267,9 +269,6 @@ def m2m_changed(sender, instance, action, reverse, model, pk_set, using, **kwarg
                         user_pk_as_string=str(user.username) if user else user
                     )
             except Exception as e:
-                logger.exception(
-                    "easy audit had a pre-save exception on CRUDEvent creation. instance: {}, instance pk: {}".format(
-                        instance, instance.pk))
                 transaction.savepoint_rollback(sid)
     except Exception:
         logger.exception('easy audit had an m2m-changed exception.')
@@ -306,7 +305,7 @@ def post_delete(sender, instance, using, **kwargs):
                     return None
                 with transaction.atomic():
                     # crud event
-                    crud_event = CRUDEvent.objects.create(
+                    CRUDEvent.objects.create(
                         event_type=CRUDEvent.DELETE,
                         object_repr=str(instance),
                         object_json_repr=object_json_repr,
@@ -318,16 +317,17 @@ def post_delete(sender, instance, using, **kwargs):
                     )
 
             except Exception as e:
-                logger.exception(
-                    "easy audit had a pre-save exception on CRUDEvent creation. instance: {}, instance pk: {}".format(
-                        instance, instance.pk))
                 transaction.savepoint_rollback(sid)
     except Exception:
         logger.exception('easy audit had a post-delete exception.')
 
 
 if WATCH_MODEL_EVENTS:
-    signals.post_save.connect(post_save, dispatch_uid='easy_audit_signals_post_save')
-    signals.pre_save.connect(pre_save, dispatch_uid='easy_audit_signals_pre_save')
-    signals.m2m_changed.connect(m2m_changed, dispatch_uid='easy_audit_signals_m2m_changed')
-    signals.post_delete.connect(post_delete, dispatch_uid='easy_audit_signals_post_delete')
+    signals.post_save.connect(
+        post_save, dispatch_uid='easy_audit_signals_post_save')
+    signals.pre_save.connect(
+        pre_save, dispatch_uid='easy_audit_signals_pre_save')
+    signals.m2m_changed.connect(
+        m2m_changed, dispatch_uid='easy_audit_signals_m2m_changed')
+    signals.post_delete.connect(
+        post_delete, dispatch_uid='easy_audit_signals_post_delete')
