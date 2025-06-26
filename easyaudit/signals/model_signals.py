@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.db.utils import OperationalError
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -125,9 +126,9 @@ def pre_save(sender, instance, raw, using, update_fields, **kwargs):
                             })
                     except Exception as e:
                         try:
-                            logger.exception(
+                            logger.error(
                                 "easy audit had a pre_save exception on CRUDEvent creation. instance: {}, instance pk: {}".format(
-                                    instance, instance.pk))
+                                    instance, instance.pk), exc_info=True)
                         except Exception:
                             pass
                 if getattr(settings, "TEST", False):
@@ -135,7 +136,7 @@ def pre_save(sender, instance, raw, using, update_fields, **kwargs):
                 else:
                     transaction.on_commit(crud_flow, using=using)
     except Exception:
-        logger.exception('easy audit had a pre-save exception.')
+        logger.error('easy audit had a pre-save exception.', exc_info=True)
 
 
 def post_save(sender, instance, created, raw, using, update_fields, **kwargs):
@@ -184,17 +185,20 @@ def post_save(sender, instance, created, raw, using, update_fields, **kwargs):
                             })
                     except Exception as e:
                         try:
-                            logger.exception(
+                            logger.error(
                                 "easy audit had a post_save exception on CRUDEvent creation. instance: {}, instance pk: {}".format(
-                                    instance, instance.pk))
+                                    instance, instance.pk), exc_info=True)
                         except Exception:
                             pass
                 if getattr(settings, "TEST", False):
                     crud_flow()
                 else:
                     transaction.on_commit(crud_flow, using=using)
-    except Exception:
-        logger.exception('easy audit had a post-save exception.')
+                    
+    except OperationalError as ex:
+        logger.error(f'Easy audit had a post-save OperationalError. {ex}', exc_info=True)    
+    except Exception as ex:
+        logger.error(f'Easy audit had a post-save exception. {ex}', exc_info=True)
 
 
 def _m2m_rev_field_name(model1, model2):
@@ -282,9 +286,9 @@ def m2m_changed(sender, instance, action, reverse, model, pk_set, using, **kwarg
                         })
                 except Exception as e:
                     try:
-                        logger.exception(
+                        logger.error(
                             "easy audit had a m2m_changed exception on CRUDEvent creation. instance: {}, instance pk: {}".format(
-                                instance, instance.pk))
+                                instance, instance.pk), exc_info=True)
                     except Exception:
                         pass
 
@@ -292,8 +296,10 @@ def m2m_changed(sender, instance, action, reverse, model, pk_set, using, **kwarg
                 crud_flow()
             else:
                 transaction.on_commit(crud_flow, using=using)
-    except Exception:
-        logger.exception('easy audit had an m2m-changed exception.')
+    except OperationalError as ex:
+        logger.error(f'Easy audit had a m2m-changed OperationalError. {ex}', exc_info=True)    
+    except Exception as ex:
+        logger.error(f'Easy audit had a m2m-changed exception. {ex}', exc_info=True)
 
 
 def post_delete(sender, instance, using, **kwargs):
@@ -330,9 +336,9 @@ def post_delete(sender, instance, using, **kwargs):
 
                 except Exception as e:
                     try:
-                        logger.exception(
+                        logger.error(
                             "easy audit had a post_delete exception on CRUDEvent creation. instance: {}, instance pk: {}".format(
-                                instance, instance.pk))
+                                instance, instance.pk), exc_info=True)
                     except Exception:
                         pass
 
@@ -340,8 +346,10 @@ def post_delete(sender, instance, using, **kwargs):
                 crud_flow()
             else:
                 transaction.on_commit(crud_flow, using=using)
-    except Exception:
-        logger.exception('easy audit had a post-delete exception.')
+    except OperationalError as ex:
+        logger.error(f'Easy audit had a post-delete OperationalError. {ex}', exc_info=True)    
+    except Exception as ex:
+        logger.error(f'Easy audit had a post-delete exception. {ex}', exc_info=True)
 
 
 if WATCH_MODEL_EVENTS:
